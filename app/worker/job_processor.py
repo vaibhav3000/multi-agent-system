@@ -9,7 +9,7 @@ from app.core.database import AsyncSessionLocal, init_db
 from app.worker.pipeline import run_full_pipeline
 
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0") or "redis://localhost:6379/0"
 
 celery_app = Celery(
     "multi_agent_system",
@@ -36,4 +36,3 @@ def process_query(job_id: str, query: str) -> dict:
         return ctx.model_dump(mode="json")
 
     return asyncio.run(_run())
-

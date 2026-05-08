@@ -12,7 +12,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql+asyncpg://user:pass@localhost:5432/agentdb",
-)
+) or "postgresql+asyncpg://user:pass@localhost:5432/agentdb"
 
 
 class Base(DeclarativeBase):
@@ -116,4 +116,3 @@ async def get_latest_eval_summary(session: AsyncSession) -> dict:
             for name, scores in data["dimensions"].items()
         }
     return grouped
-
