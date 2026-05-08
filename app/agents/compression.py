@@ -1,13 +1,9 @@
 import json
-import os
-
-from anthropic import Anthropic
 
 from app.core.budget import consume_budget, register_agent_budget
 from app.core.context_schema import AgentID, AgentOutput, SharedContext
+from app.core.llm import call_llm
 from app.core.logger import structured_log
-
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", "missing"))
 
 COMPRESSION_SYSTEM = """Compress shared context for downstream agents.
 Preserve open tasks, key claims, citations, budget state, and unresolved critique flags.
@@ -21,16 +17,11 @@ async def run_compression(ctx: SharedContext) -> dict:
     if not consume_budget(ctx, AgentID.COMPRESSION, prompt):
         result = {"summary": "Compression budget exceeded", "preserved_claims": [], "dropped_details": []}
     else:
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1200,
-            system=COMPRESSION_SYSTEM,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        response = call_llm(prompt, system=COMPRESSION_SYSTEM, max_tokens=1200)
         try:
-            result = json.loads(response.content[0].text)
+            result = json.loads(response.text)
         except json.JSONDecodeError:
-            result = {"summary": response.content[0].text, "preserved_claims": [], "dropped_details": []}
+            result = {"summary": response.text, "preserved_claims": [], "dropped_details": []}
     structured_log(
         agent_id=AgentID.COMPRESSION.value,
         event_type="compression_complete",

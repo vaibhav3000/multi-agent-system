@@ -1,14 +1,10 @@
 import json
-import os
 import time
-
-from anthropic import Anthropic
 
 from app.core.budget import consume_budget, register_agent_budget
 from app.core.context_schema import AgentID, AgentOutput, SharedContext, SubTask
+from app.core.llm import call_llm
 from app.core.logger import structured_log
-
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", "missing"))
 
 DECOMPOSITION_SYSTEM = """You are a decomposition agent. Break the given query into typed sub-tasks.
 
@@ -47,14 +43,9 @@ async def run_decomposition(ctx: SharedContext) -> list[SubTask]:
         )
         return []
 
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=1000,
-        system=DECOMPOSITION_SYSTEM,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    response = call_llm(prompt, system=DECOMPOSITION_SYSTEM, max_tokens=1000)
 
-    raw = response.content[0].text
+    raw = response.text
     latency = (time.time() - start) * 1000
 
     try:
@@ -85,14 +76,14 @@ async def run_decomposition(ctx: SharedContext) -> list[SubTask]:
         input_data=ctx.original_query,
         output_data=[t.model_dump() for t in subtasks],
         latency_ms=latency,
-        token_count=response.usage.input_tokens + response.usage.output_tokens,
+        token_count=response.total_tokens,
         job_id=ctx.job_id,
     )
 
     ctx.agent_outputs[AgentID.DECOMPOSITION.value] = AgentOutput(
         agent_id=AgentID.DECOMPOSITION,
         output=[t.model_dump(mode="json") for t in subtasks],
-        token_count=response.usage.input_tokens + response.usage.output_tokens,
+        token_count=response.total_tokens,
     )
 
     return subtasks

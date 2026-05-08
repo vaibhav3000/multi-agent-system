@@ -1,15 +1,11 @@
 import json
-import os
 import time
-
-from anthropic import Anthropic
 
 from app.core.budget import consume_budget, register_agent_budget
 from app.core.context_schema import AgentID, AgentOutput, SharedContext, ToolCall
+from app.core.llm import call_llm
 from app.core.logger import structured_log
 from app.tools.web_search import run_web_search
-
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", "missing"))
 
 RETRIEVAL_SYSTEM = """You are a retrieval-augmented reasoning agent. You perform multi-hop reasoning.
 
@@ -62,14 +58,9 @@ Chunk 2 findings: {json.dumps(hop2_result)}
 Now produce a JSON answer following the required output format with citations linking claims to chunk_1 or chunk_2.
 """
 
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=1500,
-        system=RETRIEVAL_SYSTEM,
-        messages=[{"role": "user", "content": synthesis_prompt}],
-    )
+    response = call_llm(synthesis_prompt, system=RETRIEVAL_SYSTEM, max_tokens=1500)
 
-    raw = response.content[0].text
+    raw = response.text
     latency = (time.time() - start) * 1000
 
     try:
@@ -88,14 +79,14 @@ Now produce a JSON answer following the required output format with citations li
         input_data=ctx.original_query,
         output_data=result,
         latency_ms=latency,
-        token_count=response.usage.input_tokens + response.usage.output_tokens,
+        token_count=response.total_tokens,
         job_id=ctx.job_id,
     )
 
     ctx.agent_outputs[AgentID.RETRIEVAL.value] = AgentOutput(
         agent_id=AgentID.RETRIEVAL,
         output=result,
-        token_count=response.usage.input_tokens + response.usage.output_tokens,
+        token_count=response.total_tokens,
         provenance=result.get("citations", {}),
     )
 
@@ -139,17 +130,13 @@ async def _do_retrieval_hop(ctx: SharedContext, query: str, hop_number: int) -> 
 
 
 async def _derive_followup_query(original_query: str, hop1_result: dict) -> str:
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=100,
-        messages=[{
-            "role": "user",
-            "content": f"""
+    response = call_llm(
+        f"""
 Given the original query: "{original_query}"
 And the first retrieval result: {json.dumps(hop1_result)[:500]}
 
 What is a good follow-up search query to get complementary information? Reply with only the query string, no explanation.
 """,
-        }],
+        max_tokens=100,
     )
-    return response.content[0].text.strip()
+    return response.text.strip()

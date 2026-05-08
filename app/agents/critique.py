@@ -1,14 +1,10 @@
 import json
-import os
 import time
-
-from anthropic import Anthropic
 
 from app.core.budget import consume_budget, register_agent_budget
 from app.core.context_schema import AgentID, AgentOutput, ClaimScore, SharedContext
+from app.core.llm import call_llm
 from app.core.logger import structured_log
-
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", "missing"))
 
 CRITIQUE_SYSTEM = """You are a critique agent. You review outputs from other agents claim by claim.
 
@@ -62,14 +58,9 @@ Score every distinct claim or sentence separately.
         structured_log(agent_id=AgentID.CRITIQUE.value, event_type="budget_violation", job_id=ctx.job_id)
         return {"claim_scores": [], "overall_reliability": 0.0, "summary": "Budget exceeded"}
 
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=2000,
-        system=CRITIQUE_SYSTEM,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    response = call_llm(prompt, system=CRITIQUE_SYSTEM, max_tokens=2000)
 
-    raw = response.content[0].text
+    raw = response.text
     latency = (time.time() - start) * 1000
 
     try:
@@ -92,7 +83,7 @@ Score every distinct claim or sentence separately.
         event_type="critique_complete",
         output_data=result,
         latency_ms=latency,
-        token_count=response.usage.input_tokens + response.usage.output_tokens,
+        token_count=response.total_tokens,
         job_id=ctx.job_id,
     )
 
@@ -100,7 +91,7 @@ Score every distinct claim or sentence separately.
         agent_id=AgentID.CRITIQUE,
         output=result,
         claim_scores=claim_scores,
-        token_count=response.usage.input_tokens + response.usage.output_tokens,
+        token_count=response.total_tokens,
     )
 
     return result

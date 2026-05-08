@@ -1,14 +1,10 @@
 import json
-import os
 import time
-
-from anthropic import Anthropic
 
 from app.core.budget import consume_budget, register_agent_budget
 from app.core.context_schema import AgentID, AgentOutput, SharedContext
+from app.core.llm import call_llm
 from app.core.logger import structured_log
-
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", "missing"))
 
 SYNTHESIS_SYSTEM = """You are a synthesis agent. You merge outputs from all prior agents into a final answer.
 
@@ -70,14 +66,9 @@ Produce the final synthesized answer with provenance map and contradiction resol
         structured_log(agent_id=AgentID.SYNTHESIS.value, event_type="budget_violation", job_id=ctx.job_id)
         return {"final_answer": "Budget exceeded during synthesis", "contradiction_resolutions": [], "provenance_map": {}}
 
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=2000,
-        system=SYNTHESIS_SYSTEM,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    response = call_llm(prompt, system=SYNTHESIS_SYSTEM, max_tokens=2000)
 
-    raw = response.content[0].text
+    raw = response.text
     latency = (time.time() - start) * 1000
 
     try:
@@ -97,14 +88,14 @@ Produce the final synthesized answer with provenance map and contradiction resol
         event_type="synthesis_complete",
         output_data=result,
         latency_ms=latency,
-        token_count=response.usage.input_tokens + response.usage.output_tokens,
+        token_count=response.total_tokens,
         job_id=ctx.job_id,
     )
 
     ctx.agent_outputs[AgentID.SYNTHESIS.value] = AgentOutput(
         agent_id=AgentID.SYNTHESIS,
         output=result,
-        token_count=response.usage.input_tokens + response.usage.output_tokens,
+        token_count=response.total_tokens,
         provenance=result.get("provenance_map", {}),
     )
 

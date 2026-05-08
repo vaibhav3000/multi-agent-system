@@ -1,14 +1,10 @@
 import json
-import os
 import time
-
-from anthropic import Anthropic
 
 from app.core.budget import check_remaining_budget, consume_budget, register_agent_budget
 from app.core.context_schema import AgentID, AgentOutput, SharedContext
+from app.core.llm import call_llm
 from app.core.logger import structured_log
-
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", "missing"))
 
 ORCHESTRATOR_SYSTEM = """You are a master orchestrator agent. Given a user query and the current pipeline state, you must decide:
 1. Which sub-agents to invoke next (decomposition, retrieval, critique, synthesis)
@@ -66,14 +62,9 @@ Decide which agents to run next and in what order. Output only valid JSON.
             "skip_reasons": {},
         }
 
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=1000,
-        system=ORCHESTRATOR_SYSTEM,
-        messages=[{"role": "user", "content": user_message}],
-    )
+    response = call_llm(user_message, system=ORCHESTRATOR_SYSTEM, max_tokens=1000)
 
-    raw = response.content[0].text
+    raw = response.text
     latency = (time.time() - start) * 1000
 
     try:
@@ -98,14 +89,14 @@ Decide which agents to run next and in what order. Output only valid JSON.
         input_data=pipeline_state,
         output_data=routing,
         latency_ms=latency,
-        token_count=response.usage.input_tokens + response.usage.output_tokens,
+        token_count=response.total_tokens,
         job_id=ctx.job_id,
     )
 
     ctx.agent_outputs[AgentID.ORCHESTRATOR.value] = AgentOutput(
         agent_id=AgentID.ORCHESTRATOR,
         output=routing,
-        token_count=response.usage.input_tokens + response.usage.output_tokens,
+        token_count=response.total_tokens,
     )
 
     return routing

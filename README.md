@@ -1,6 +1,6 @@
 # Multi-Agent LLM System
 
-A FastAPI + Celery + PostgreSQL + Redis scaffold for a multi-agent LLM pipeline using Anthropic Claude, SSE streaming, explicit tool failure contracts, and an evaluation-driven prompt rewrite loop.
+A FastAPI + Celery + PostgreSQL + Redis scaffold for a multi-agent LLM pipeline using Anthropic, Groq, DeepSeek, Gemini, or a mock LLM provider, with SSE streaming, explicit tool failure contracts, and an evaluation-driven prompt rewrite loop.
 
 ## Setup Instructions
 
@@ -10,7 +10,47 @@ A FastAPI + Celery + PostgreSQL + Redis scaffold for a multi-agent LLM pipeline 
 cp .env.example .env
 ```
 
-2. Fill in `ANTHROPIC_API_KEY` and adjust database or Redis URLs if needed.
+2. Choose an LLM provider in `.env`.
+
+For a no-credit plumbing test:
+
+```env
+LLM_PROVIDER=mock
+```
+
+For Groq:
+
+```env
+LLM_PROVIDER=groq
+GROQ_API_KEY=your_key
+GROQ_MODEL=llama-3.3-70b-versatile
+```
+
+For DeepSeek:
+
+```env
+LLM_PROVIDER=deepseek
+DEEPSEEK_API_KEY=your_key
+DEEPSEEK_MODEL=deepseek-chat
+```
+
+For Gemini:
+
+```env
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your_key
+GEMINI_MODEL=gemini-1.5-flash
+```
+
+For Anthropic:
+
+```env
+LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=your_key
+ANTHROPIC_MODEL=claude-sonnet-4-20250514
+```
+
+Then adjust database or Redis URLs if needed.
 
 3. Start the stack:
 
@@ -63,6 +103,7 @@ PostgreSQL trace, eval, rewrite, and log tables
 ## Known Limitations
 
 - The default web search tool returns structured stub results unless `SEARCH_API_URL` is provided.
+- `LLM_PROVIDER=mock` verifies application plumbing but does not produce factual model answers.
 - The prompt rewrite approval flow records approval and reruns evals, but runtime prompts are still code-defined until a DB-backed prompt registry is added.
 - SSE token streaming is event-level rather than true model token passthrough.
 - The code executor uses basic import stripping and is not a production security sandbox.
@@ -80,4 +121,3 @@ It does not automatically change live prompts. Approval is explicit, and the cur
 - Persist structured execution logs from `structured_log` into `ExecutionLog`.
 - Add Alembic migrations instead of `metadata.create_all`.
 - Add authentication and tenant boundaries before exposing this outside local development.
-

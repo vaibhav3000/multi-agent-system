@@ -1,8 +1,6 @@
 import json
-import os
 from datetime import datetime
 
-from anthropic import Anthropic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,9 +10,8 @@ from app.agents.orchestrator import ORCHESTRATOR_SYSTEM
 from app.agents.retrieval import RETRIEVAL_SYSTEM
 from app.agents.synthesis import SYNTHESIS_SYSTEM
 from app.core.database import EvalRun, PerformanceDelta, PromptRewrite
+from app.core.llm import call_llm
 from app.eval.harness import run_eval_suite
-
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", "missing"))
 
 DIMENSION_TO_AGENT = {
     "answer_correctness": "synthesis",
@@ -50,16 +47,8 @@ async def propose_prompt_rewrite(session: AsyncSession) -> dict:
     agent_id = DIMENSION_TO_AGENT.get(worst_dimension, "synthesis")
     original_prompt = AGENT_PROMPTS[agent_id]
 
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=1800,
-        system=(
-            "You improve agent system prompts from eval failures. "
-            "Return JSON with keys proposed_prompt, diff, justification. Never claim the rewrite was applied."
-        ),
-        messages=[{
-            "role": "user",
-            "content": f"""
+    response = call_llm(
+        f"""
 Worst eval:
 test_case_id={lowest.test_case_id}
 category={lowest.category}
@@ -70,14 +59,18 @@ Prompt to improve for agent {agent_id}:
 
 Rewrite this prompt to improve the worst dimension: {worst_dimension}.
 """,
-        }],
+        max_tokens=1800,
+        system=(
+            "You improve agent system prompts from eval failures. "
+            "Return JSON with keys proposed_prompt, diff, justification. Never claim the rewrite was applied."
+        ),
     )
 
     try:
-        proposed = json.loads(response.content[0].text)
+        proposed = json.loads(response.text)
     except json.JSONDecodeError:
         proposed = {
-            "proposed_prompt": response.content[0].text,
+            "proposed_prompt": response.text,
             "diff": "Model returned free-form text instead of structured diff.",
             "justification": f"Improve {worst_dimension} based on failed eval {lowest.test_case_id}.",
         }

@@ -2,9 +2,8 @@ import json
 import os
 
 import asyncpg
-from anthropic import Anthropic
 
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", "missing"))
+from app.core.llm import call_llm
 
 SCHEMA_DESCRIPTION = """
 Tables:
@@ -21,22 +20,18 @@ def _asyncpg_url() -> str:
 
 
 async def _query_to_sql(natural_language_query: str) -> str:
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+    response = call_llm(
+        f"Schema:\n{SCHEMA_DESCRIPTION}\nQuestion: {natural_language_query}",
         max_tokens=300,
         system=(
             "Convert natural language to a single read-only PostgreSQL SELECT query. "
             "Only use the provided schema. Return JSON: {\"sql\": \"SELECT ...\"}."
         ),
-        messages=[{
-            "role": "user",
-            "content": f"Schema:\n{SCHEMA_DESCRIPTION}\nQuestion: {natural_language_query}",
-        }],
     )
     try:
-        return json.loads(response.content[0].text)["sql"]
+        return json.loads(response.text)["sql"]
     except Exception:
-        return response.content[0].text.strip()
+        return response.text.strip()
 
 
 async def run_data_lookup(natural_language_query: str):
