@@ -1,0 +1,83 @@
+# Multi-Agent LLM System
+
+A FastAPI + Celery + PostgreSQL + Redis scaffold for a multi-agent LLM pipeline using Anthropic Claude, SSE streaming, explicit tool failure contracts, and an evaluation-driven prompt rewrite loop.
+
+## Setup Instructions
+
+1. Copy environment variables:
+
+```bash
+cp .env.example .env
+```
+
+2. Fill in `ANTHROPIC_API_KEY` and adjust database or Redis URLs if needed.
+
+3. Start the stack:
+
+```bash
+docker compose up --build
+```
+
+4. API runs on `http://localhost:8000`; log UI runs on `http://localhost:8001`.
+
+## Architecture Diagram
+
+```text
+User
+  |
+  v
+FastAPI /query (SSE)
+  |
+  v
+Redis + Celery worker
+  |
+  v
+Orchestrator -> Decomposition -> Retrieval -> Critique -> Synthesis
+                     |              |
+                     |              +-> web_search tool
+                     |
+                     +-> SharedContext
+  |
+  v
+PostgreSQL trace, eval, rewrite, and log tables
+```
+
+## Agent Descriptions and Decision Boundaries
+
+- `orchestrator` chooses the next agents and execution order from the current context.
+- `decomposition` creates subtasks and dependency relationships.
+- `retrieval` performs two-hop retrieval and maps claims to chunks.
+- `critique` scores claims, flags unsupported or contradictory spans, and avoids blanket rejection.
+- `synthesis` resolves flagged claims and writes the final answer with provenance.
+- `compression` can summarize context when budgets become tight.
+- `meta` inspects poor eval runs and stores prompt rewrite proposals with `pending` status.
+
+## API Routes
+
+- `POST /query`: streams SSE events while a query job runs.
+- `GET /jobs/{job_id}/trace`: returns the persisted execution trace.
+- `GET /evals/latest`: returns latest eval summary grouped by category.
+- `POST /rewrites/{rewrite_id}`: approve or reject a proposed prompt rewrite.
+- `POST /evals/rerun`: reruns evals on previously failed cases.
+
+## Known Limitations
+
+- The default web search tool returns structured stub results unless `SEARCH_API_URL` is provided.
+- The prompt rewrite approval flow records approval and reruns evals, but runtime prompts are still code-defined until a DB-backed prompt registry is added.
+- SSE token streaming is event-level rather than true model token passthrough.
+- The code executor uses basic import stripping and is not a production security sandbox.
+
+## What the Self-Improving Loop Does and Does Not Do
+
+It finds the lowest-scoring eval run, identifies the weakest scoring dimension, maps that dimension to the likely responsible agent, asks Claude for a structured prompt rewrite, and stores the rewrite as `pending`.
+
+It does not automatically change live prompts. Approval is explicit, and the current scaffold records the approval plus before/after eval deltas.
+
+## What to Build Next
+
+- Add a DB-backed prompt registry and load active prompts at runtime.
+- Replace stub search with a production search API.
+- Persist structured execution logs from `structured_log` into `ExecutionLog`.
+- Add Alembic migrations instead of `metadata.create_all`.
+- Add authentication and tenant boundaries before exposing this outside local development.
+
