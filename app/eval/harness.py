@@ -50,6 +50,7 @@ async def run_eval_suite(session: AsyncSession | None = None, failed_only: bool 
             await save_context(session, ctx)
 
             session.add(EvalRun(
+                job_id=ctx.job_id,
                 timestamp=datetime.utcnow(),
                 test_case_id=case["id"],
                 category=case["category"],
@@ -66,7 +67,7 @@ async def run_eval_suite(session: AsyncSession | None = None, failed_only: bool 
                 if isinstance(value, dict) and "score" in value:
                     bucket["dimensions"][name] += value["score"]
 
-        normalized = {}
+        normalized = {"case_results": []}
         for category, data in summary.items():
             count = max(data["count"], 1)
             normalized[category] = {
@@ -74,8 +75,16 @@ async def run_eval_suite(session: AsyncSession | None = None, failed_only: bool 
                 "overall_average": data["overall_average"] / count,
                 "dimensions": {name: value / count for name, value in data["dimensions"].items()},
             }
+        result = await session.execute(select(EvalRun).order_by(EvalRun.timestamp.desc()).limit(len(cases)))
+        for row in result.scalars().all():
+            normalized["case_results"].append({
+                "test_case_id": row.test_case_id,
+                "job_id": row.job_id,
+                "category": row.category,
+                "overall_average": row.scores_json.get("overall_average"),
+                "scores": row.scores_json,
+            })
         return normalized
     finally:
         if owns_session:
             await session.close()
-

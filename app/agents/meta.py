@@ -9,7 +9,7 @@ from app.agents.decomposition import DECOMPOSITION_SYSTEM
 from app.agents.orchestrator import ORCHESTRATOR_SYSTEM
 from app.agents.retrieval import RETRIEVAL_SYSTEM
 from app.agents.synthesis import SYNTHESIS_SYSTEM
-from app.core.database import EvalRun, PerformanceDelta, PromptRewrite
+from app.core.database import AgentPrompt, EvalRun, PerformanceDelta, PromptRewrite
 from app.core.llm import call_llm
 from app.eval.harness import run_eval_suite
 
@@ -106,6 +106,19 @@ async def handle_rewrite_action(session: AsyncSession, rewrite_id: str, action: 
     before = await run_eval_suite(session=session, failed_only=True)
     rewrite.status = "approved"
     rewrite.approved_at = datetime.utcnow()
+    active_prompt = await session.get(AgentPrompt, rewrite.agent_id)
+    if active_prompt is None:
+        active_prompt = AgentPrompt(
+            agent_id=rewrite.agent_id,
+            active_prompt=rewrite.proposed_prompt,
+            rewrite_id=rewrite.rewrite_id,
+            updated_at=datetime.utcnow(),
+        )
+        session.add(active_prompt)
+    else:
+        active_prompt.active_prompt = rewrite.proposed_prompt
+        active_prompt.rewrite_id = rewrite.rewrite_id
+        active_prompt.updated_at = datetime.utcnow()
     after = await run_eval_suite(session=session, failed_only=True)
     session.add(PerformanceDelta(
         rewrite_id=rewrite_id,

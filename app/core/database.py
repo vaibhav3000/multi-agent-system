@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import AsyncGenerator
 
-from sqlalchemy import DateTime, Float, Integer, String, Text, select
+from sqlalchemy import DateTime, Float, Integer, String, Text, select, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -34,6 +34,7 @@ class EvalRun(Base):
     __tablename__ = "eval_runs"
 
     run_id: Mapped[str] = mapped_column(String(64), default=lambda: str(uuid.uuid4()), primary_key=True)
+    job_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     test_case_id: Mapped[str] = mapped_column(String(64), nullable=False)
     category: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -67,6 +68,15 @@ class PerformanceDelta(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class AgentPrompt(Base):
+    __tablename__ = "agent_prompts"
+
+    agent_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    active_prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    rewrite_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class ExecutionLog(Base):
     __tablename__ = "execution_logs"
 
@@ -89,6 +99,14 @@ AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _ensure_lightweight_schema_updates(conn)
+
+
+async def _ensure_lightweight_schema_updates(conn) -> None:
+    if not DATABASE_URL.startswith("postgresql"):
+        return
+    await conn.execute(text("ALTER TABLE eval_runs ADD COLUMN IF NOT EXISTS job_id VARCHAR(64)"))
+    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_eval_runs_job_id ON eval_runs (job_id)"))
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

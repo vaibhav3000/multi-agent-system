@@ -4,7 +4,7 @@ sqlalchemy
 asyncpg
 redis
 celery
-anthropic
+openai
 langchain
 langchain-community
 chromadb
@@ -15,4 +15,3 @@ pydantic
 alembic
 httpx
 psycopg2-binary
-

@@ -1,6 +1,6 @@
 # Multi-Agent LLM System
 
-A FastAPI + Celery + PostgreSQL + Redis scaffold for a multi-agent LLM pipeline using Anthropic, Groq, DeepSeek, Gemini, or a mock LLM provider, with SSE streaming, explicit tool failure contracts, and an evaluation-driven prompt rewrite loop.
+A FastAPI + Celery + PostgreSQL + Redis scaffold for a multi-agent LLM pipeline using DeepSeek by default, with optional Groq, Gemini, or mock providers, SSE streaming, explicit tool failure contracts, and an evaluation-driven prompt rewrite loop.
 
 ## Setup Instructions
 
@@ -12,10 +12,12 @@ cp .env.example .env
 
 2. Choose an LLM provider in `.env`.
 
-For a no-credit plumbing test:
+DeepSeek is the primary/default provider:
 
 ```env
-LLM_PROVIDER=mock
+LLM_PROVIDER=deepseek
+DEEPSEEK_API_KEY=your_key
+DEEPSEEK_MODEL=deepseek-chat
 ```
 
 For Groq:
@@ -26,12 +28,10 @@ GROQ_API_KEY=your_key
 GROQ_MODEL=llama-3.3-70b-versatile
 ```
 
-For DeepSeek:
+For a no-credit plumbing test:
 
 ```env
-LLM_PROVIDER=deepseek
-DEEPSEEK_API_KEY=your_key
-DEEPSEEK_MODEL=deepseek-chat
+LLM_PROVIDER=mock
 ```
 
 For Gemini:
@@ -40,14 +40,6 @@ For Gemini:
 LLM_PROVIDER=gemini
 GEMINI_API_KEY=your_key
 GEMINI_MODEL=gemini-1.5-flash
-```
-
-For Anthropic:
-
-```env
-LLM_PROVIDER=anthropic
-ANTHROPIC_API_KEY=your_key
-ANTHROPIC_MODEL=claude-sonnet-4-20250514
 ```
 
 Then adjust database or Redis URLs if needed.

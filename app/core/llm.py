@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
-from anthropic import Anthropic
+from openai import OpenAI
 
 
 @dataclass
@@ -19,7 +19,7 @@ class LLMResponse:
 
 
 def _provider() -> str:
-    return os.getenv("LLM_PROVIDER", "anthropic").strip().lower()
+    return os.getenv("LLM_PROVIDER", "deepseek").strip().lower()
 
 
 def _require_env(name: str) -> str:
@@ -66,7 +66,7 @@ def _mock_response(system: str | None, user_content: str) -> LLMResponse:
         })
     elif "final_answer" in lower and "provenance_map" in lower:
         text = json.dumps({
-            "final_answer": "Mock final answer produced for plumbing verification. Replace LLM_PROVIDER=mock with a real provider for factual answers.",
+            "final_answer": "Mock final answer produced for plumbing verification. Set LLM_PROVIDER=deepseek for real model answers.",
             "contradiction_resolutions": [],
             "provenance_map": {
                 "Mock final answer produced for plumbing verification.": "synthesis + mock"
@@ -98,25 +98,23 @@ def call_llm(
     provider = _provider()
     if provider == "mock":
         return _mock_response(system, user_content)
-    if provider == "anthropic":
-        return _call_anthropic(user_content, system=system, max_tokens=max_tokens, model=model)
-    if provider == "groq":
-        return _call_openai_compatible(
-            user_content,
-            system=system,
-            max_tokens=max_tokens,
-            model=model or os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
-            api_key_env="GROQ_API_KEY",
-            base_url=os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1"),
-        )
     if provider == "deepseek":
-        return _call_openai_compatible(
+        return _call_openai_sdk(
             user_content,
             system=system,
             max_tokens=max_tokens,
             model=model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
             api_key_env="DEEPSEEK_API_KEY",
             base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+        )
+    if provider == "groq":
+        return _call_openai_sdk(
+            user_content,
+            system=system,
+            max_tokens=max_tokens,
+            model=model or os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            api_key_env="GROQ_API_KEY",
+            base_url=os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1"),
         )
     if provider == "gemini":
         return _call_gemini(
@@ -128,28 +126,7 @@ def call_llm(
     raise RuntimeError(f"Unsupported LLM_PROVIDER={provider}")
 
 
-def _call_anthropic(
-    user_content: str,
-    *,
-    system: str | None,
-    max_tokens: int,
-    model: str | None,
-) -> LLMResponse:
-    client = Anthropic(api_key=_require_env("ANTHROPIC_API_KEY"))
-    response = client.messages.create(
-        model=model or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514"),
-        max_tokens=max_tokens,
-        system=system,
-        messages=[{"role": "user", "content": user_content}],
-    )
-    return LLMResponse(
-        text=response.content[0].text,
-        input_tokens=response.usage.input_tokens,
-        output_tokens=response.usage.output_tokens,
-    )
-
-
-def _call_openai_compatible(
+def _call_openai_sdk(
     user_content: str,
     *,
     system: str | None,
@@ -158,26 +135,21 @@ def _call_openai_compatible(
     api_key_env: str,
     base_url: str,
 ) -> LLMResponse:
-    api_key = _require_env(api_key_env)
-    payload = {
-        "model": model,
-        "messages": _messages(system, user_content),
-        "max_tokens": max_tokens,
-        "temperature": 0.2,
-    }
-    with httpx.Client(timeout=60.0) as client:
-        response = client.post(
-            f"{base_url.rstrip('/')}/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json=payload,
-        )
-        response.raise_for_status()
-        data = response.json()
-    usage: dict[str, Any] = data.get("usage") or {}
+    client = OpenAI(
+        api_key=_require_env(api_key_env),
+        base_url=base_url,
+    )
+    response = client.chat.completions.create(
+        model=model,
+        messages=_messages(system, user_content),
+        max_tokens=max_tokens,
+        temperature=0.2,
+    )
+    usage: Any = response.usage
     return LLMResponse(
-        text=data["choices"][0]["message"]["content"],
-        input_tokens=int(usage.get("prompt_tokens") or 0),
-        output_tokens=int(usage.get("completion_tokens") or 0),
+        text=response.choices[0].message.content or "",
+        input_tokens=int(getattr(usage, "prompt_tokens", 0) or 0),
+        output_tokens=int(getattr(usage, "completion_tokens", 0) or 0),
     )
 
 

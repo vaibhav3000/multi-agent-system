@@ -1,10 +1,10 @@
 import asyncio
-import json
 import uuid
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
@@ -29,6 +29,31 @@ class RewriteAction(BaseModel):
     action: str
 
 
+def error_payload(error_code: str, message: str, job_id: str | None = None) -> dict:
+    return {"error_code": error_code, "message": message, "job_id": job_id}
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    detail = exc.detail if isinstance(exc.detail, dict) else {}
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=error_payload(
+            detail.get("error_code", "HTTP_ERROR"),
+            detail.get("message", str(exc.detail)),
+            detail.get("job_id"),
+        ),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content=error_payload("VALIDATION_ERROR", str(exc), None),
+    )
+
+
 @app.on_event("startup")
 async def startup() -> None:
     await init_db()
@@ -45,6 +70,7 @@ async def query(request: QueryRequest):
                 await save_context(session, ctx)
             process_query.delay(job_id, request.query)
             yield sse_payload("agent_start", {"job_id": job_id, "agent_id": "orchestrator", "mode": "celery"})
+            yield sse_payload("tool_call_start", {"job_id": job_id, "tool_name": "web_search", "mode": "celery"})
             last_status = None
             while True:
                 async with AsyncSessionLocal() as session:
@@ -56,6 +82,7 @@ async def query(request: QueryRequest):
                     last_status = status
                 if status in {"complete", "failed"}:
                     final_answer = (context or {}).get("final_answer")
+                    yield sse_payload("tool_call_complete", {"job_id": job_id, "status": status, "mode": "celery"})
                     yield sse_payload("pipeline_complete", {"job_id": job_id, "status": status, "final_answer": final_answer})
                     break
                 await asyncio.sleep(1)
@@ -79,7 +106,10 @@ async def query(request: QueryRequest):
             except asyncio.TimeoutError:
                 continue
         if task.exception():
-            yield sse_payload("pipeline_complete", {"job_id": job_id, "status": "failed", "error": str(task.exception())})
+            yield sse_payload(
+                "pipeline_complete",
+                error_payload("PIPELINE_FAILED", str(task.exception()), job_id) | {"status": "failed"},
+            )
 
     return EventSourceResponse(event_generator())
 
@@ -88,7 +118,10 @@ async def query(request: QueryRequest):
 async def job_trace(job_id: str, session: AsyncSession = Depends(get_session)):
     job = await session.get(Job, job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(
+            status_code=404,
+            detail=error_payload("JOB_NOT_FOUND", "Job not found", job_id),
+        )
     return {
         "job_id": job.job_id,
         "query": job.query,
@@ -107,11 +140,13 @@ async def latest_evals(session: AsyncSession = Depends(get_session)):
 @app.post("/rewrites/{rewrite_id}")
 async def rewrite_action(rewrite_id: str, body: RewriteAction, session: AsyncSession = Depends(get_session)):
     if body.action not in {"approve", "reject"}:
-        raise HTTPException(status_code=400, detail="Action must be approve or reject")
+        raise HTTPException(
+            status_code=400,
+            detail=error_payload("INVALID_REWRITE_ACTION", "Action must be approve or reject", None),
+        )
     return await handle_rewrite_action(session, rewrite_id, body.action)
 
 
 @app.post("/evals/rerun")
 async def rerun_evals(session: AsyncSession = Depends(get_session)):
     return await run_eval_suite(session=session, failed_only=True)
-
