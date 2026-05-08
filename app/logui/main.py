@@ -2,14 +2,14 @@ from fastapi import Depends, FastAPI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import ExecutionLog, get_session, init_db
+from app.core.database import ExecutionLog, get_session
 
 app = FastAPI(title="Log UI")
 
 
 @app.on_event("startup")
 async def startup() -> None:
-    await init_db()
+    return None
 
 
 @app.get("/logs")
@@ -30,4 +30,3 @@ async def logs(job_id: str | None = None, limit: int = 100, session: AsyncSessio
         }
         for row in result.scalars().all()
     ]
-

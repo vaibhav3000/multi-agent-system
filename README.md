@@ -64,7 +64,7 @@ FastAPI /query (SSE)
 Redis + Celery worker
   |
   v
-Orchestrator -> Decomposition -> Retrieval -> Critique -> Synthesis
+DeepSeek -> Orchestrator -> Decomposition -> Retrieval -> Critique -> Synthesis
                      |              |
                      |              +-> web_search tool
                      |
@@ -96,20 +96,17 @@ PostgreSQL trace, eval, rewrite, and log tables
 
 - The default web search tool returns structured stub results unless `SEARCH_API_URL` is provided.
 - `LLM_PROVIDER=mock` verifies application plumbing but does not produce factual model answers.
-- The prompt rewrite approval flow records approval and reruns evals, but runtime prompts are still code-defined until a DB-backed prompt registry is added.
+- The prompt rewrite approval flow records approval, stores the approved prompt in the prompt registry, and reruns failed eval cases.
 - SSE token streaming is event-level rather than true model token passthrough.
 - The code executor uses basic import stripping and is not a production security sandbox.
 
 ## What the Self-Improving Loop Does and Does Not Do
 
-It finds the lowest-scoring eval run, identifies the weakest scoring dimension, maps that dimension to the likely responsible agent, asks Claude for a structured prompt rewrite, and stores the rewrite as `pending`.
+It finds the lowest-scoring eval run, identifies the weakest scoring dimension, maps that dimension to the likely responsible agent, asks the configured LLM (DeepSeek by default) for a structured prompt rewrite, and stores the rewrite as `pending`.
 
-It does not automatically change live prompts. Approval is explicit, and the current scaffold records the approval plus before/after eval deltas.
+It does not automatically change live prompts. Approval is explicit; approved rewrites are stored as active prompts and before/after eval deltas are recorded.
 
 ## What to Build Next
 
-- Add a DB-backed prompt registry and load active prompts at runtime.
 - Replace stub search with a production search API.
-- Persist structured execution logs from `structured_log` into `ExecutionLog`.
-- Add Alembic migrations instead of `metadata.create_all`.
 - Add authentication and tenant boundaries before exposing this outside local development.

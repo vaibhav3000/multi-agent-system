@@ -3,10 +3,11 @@ import time
 
 from app.core.budget import consume_budget, register_agent_budget
 from app.core.context_schema import AgentID, AgentOutput, SharedContext
+from app.core.database import get_active_prompt
 from app.core.llm import call_llm
 from app.core.logger import structured_log
 
-SYNTHESIS_SYSTEM = """You are a synthesis agent. You merge outputs from all prior agents into a final answer.
+FALLBACK_SYNTHESIS_SYSTEM = """You are a synthesis agent. You merge outputs from all prior agents into a final answer.
 
 You receive:
 - Decomposition subtasks and their statuses
@@ -36,6 +37,7 @@ Never include raw flagged contradictions in the final answer. Resolve them first
 async def run_synthesis(ctx: SharedContext) -> dict:
     start = time.time()
     register_agent_budget(ctx, AgentID.SYNTHESIS)
+    system_prompt = get_active_prompt(AgentID.SYNTHESIS.value, FALLBACK_SYNTHESIS_SYSTEM)
 
     decomp_output = ctx.agent_outputs.get(AgentID.DECOMPOSITION.value, {})
     retrieval_output = ctx.agent_outputs.get(AgentID.RETRIEVAL.value, {})
@@ -66,7 +68,7 @@ Produce the final synthesized answer with provenance map and contradiction resol
         structured_log(agent_id=AgentID.SYNTHESIS.value, event_type="budget_violation", job_id=ctx.job_id)
         return {"final_answer": "Budget exceeded during synthesis", "contradiction_resolutions": [], "provenance_map": {}}
 
-    response = call_llm(prompt, system=SYNTHESIS_SYSTEM, max_tokens=2000)
+    response = call_llm(prompt, system=system_prompt, max_tokens=2000)
 
     raw = response.text
     latency = (time.time() - start) * 1000

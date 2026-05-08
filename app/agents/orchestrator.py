@@ -3,10 +3,11 @@ import time
 
 from app.core.budget import check_remaining_budget, consume_budget, register_agent_budget
 from app.core.context_schema import AgentID, AgentOutput, SharedContext
+from app.core.database import get_active_prompt
 from app.core.llm import call_llm
 from app.core.logger import structured_log
 
-ORCHESTRATOR_SYSTEM = """You are a master orchestrator agent. Given a user query and the current pipeline state, you must decide:
+FALLBACK_ORCHESTRATOR_SYSTEM = """You are a master orchestrator agent. Given a user query and the current pipeline state, you must decide:
 1. Which sub-agents to invoke next (decomposition, retrieval, critique, synthesis)
 2. In what order
 3. Why
@@ -30,6 +31,7 @@ critique must always run before synthesis if retrieval or decomposition ran.
 async def run_orchestrator(ctx: SharedContext) -> dict:
     start = time.time()
     register_agent_budget(ctx, AgentID.ORCHESTRATOR)
+    system_prompt = get_active_prompt(AgentID.ORCHESTRATOR.value, FALLBACK_ORCHESTRATOR_SYSTEM)
 
     pipeline_state = {
         "original_query": ctx.original_query,
@@ -62,7 +64,7 @@ Decide which agents to run next and in what order. Output only valid JSON.
             "skip_reasons": {},
         }
 
-    response = call_llm(user_message, system=ORCHESTRATOR_SYSTEM, max_tokens=1000)
+    response = call_llm(user_message, system=system_prompt, max_tokens=1000)
 
     raw = response.text
     latency = (time.time() - start) * 1000

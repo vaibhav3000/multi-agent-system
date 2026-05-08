@@ -3,10 +3,11 @@ import time
 
 from app.core.budget import consume_budget, register_agent_budget
 from app.core.context_schema import AgentID, AgentOutput, ClaimScore, SharedContext
+from app.core.database import get_active_prompt
 from app.core.llm import call_llm
 from app.core.logger import structured_log
 
-CRITIQUE_SYSTEM = """You are a critique agent. You review outputs from other agents claim by claim.
+FALLBACK_CRITIQUE_SYSTEM = """You are a critique agent. You review outputs from other agents claim by claim.
 
 For each claim or sentence in the input, assign:
 - confidence (0.0 to 1.0)
@@ -37,6 +38,7 @@ Rules:
 async def run_critique(ctx: SharedContext) -> dict:
     start = time.time()
     register_agent_budget(ctx, AgentID.CRITIQUE)
+    system_prompt = get_active_prompt(AgentID.CRITIQUE.value, FALLBACK_CRITIQUE_SYSTEM)
 
     outputs_to_critique = {}
     for agent_id, agent_output in ctx.agent_outputs.items():
@@ -58,7 +60,7 @@ Score every distinct claim or sentence separately.
         structured_log(agent_id=AgentID.CRITIQUE.value, event_type="budget_violation", job_id=ctx.job_id)
         return {"claim_scores": [], "overall_reliability": 0.0, "summary": "Budget exceeded"}
 
-    response = call_llm(prompt, system=CRITIQUE_SYSTEM, max_tokens=2000)
+    response = call_llm(prompt, system=system_prompt, max_tokens=2000)
 
     raw = response.text
     latency = (time.time() - start) * 1000

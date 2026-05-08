@@ -6,13 +6,18 @@ from typing import AsyncGenerator
 from sqlalchemy import DateTime, Float, Integer, String, Text, select, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy import create_engine
 
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql+asyncpg://user:pass@localhost:5432/agentdb",
 ) or "postgresql+asyncpg://user:pass@localhost:5432/agentdb"
+
+
+def _sync_database_url(url: str) -> str:
+    return url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
 
 
 class Base(DeclarativeBase):
@@ -94,19 +99,23 @@ class ExecutionLog(Base):
 
 engine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+sync_engine = create_engine(_sync_database_url(DATABASE_URL), echo=False, pool_pre_ping=True)
+SyncSessionLocal = sessionmaker(bind=sync_engine, expire_on_commit=False)
 
 
 async def init_db() -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        await _ensure_lightweight_schema_updates(conn)
+    return None
 
 
-async def _ensure_lightweight_schema_updates(conn) -> None:
-    if not DATABASE_URL.startswith("postgresql"):
-        return
-    await conn.execute(text("ALTER TABLE eval_runs ADD COLUMN IF NOT EXISTS job_id VARCHAR(64)"))
-    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_eval_runs_job_id ON eval_runs (job_id)"))
+def get_active_prompt(agent_id: str, default_prompt: str) -> str:
+    try:
+        with SyncSessionLocal() as session:
+            prompt = session.get(AgentPrompt, agent_id)
+            if prompt and prompt.active_prompt:
+                return prompt.active_prompt
+    except Exception:
+        return default_prompt
+    return default_prompt
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

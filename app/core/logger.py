@@ -3,6 +3,8 @@ import json
 from datetime import datetime
 from typing import Any, Optional
 
+from app.core.database import ExecutionLog, SyncSessionLocal
+
 
 def hash_content(content: Any) -> str:
     serialized = json.dumps(content, default=str, sort_keys=True)
@@ -32,6 +34,21 @@ def structured_log(
         "policy_violations": policy_violations or [],
         "message": message,
     }
+    try:
+        with SyncSessionLocal() as session:
+            session.add(ExecutionLog(
+                job_id=job_id,
+                agent_id=agent_id,
+                event_type=event_type,
+                input_hash=entry["input_hash"],
+                output_hash=entry["output_hash"],
+                latency_ms=latency_ms,
+                token_count=token_count,
+                policy_violations=policy_violations or [],
+                timestamp=datetime.fromisoformat(entry["timestamp"]),
+            ))
+            session.commit()
+    except Exception:
+        pass
     print(json.dumps(entry), flush=True)
     return entry
-

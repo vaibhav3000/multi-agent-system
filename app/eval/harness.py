@@ -4,11 +4,11 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.critique import CRITIQUE_SYSTEM
-from app.agents.decomposition import DECOMPOSITION_SYSTEM
-from app.agents.orchestrator import ORCHESTRATOR_SYSTEM
-from app.agents.retrieval import RETRIEVAL_SYSTEM
-from app.agents.synthesis import SYNTHESIS_SYSTEM
+from app.agents.critique import FALLBACK_CRITIQUE_SYSTEM
+from app.agents.decomposition import FALLBACK_DECOMPOSITION_SYSTEM
+from app.agents.orchestrator import FALLBACK_ORCHESTRATOR_SYSTEM
+from app.agents.retrieval import FALLBACK_RETRIEVAL_SYSTEM
+from app.agents.synthesis import FALLBACK_SYNTHESIS_SYSTEM
 from app.core.context_manager import save_context
 from app.core.context_schema import SharedContext
 from app.core.database import AsyncSessionLocal, EvalRun
@@ -17,11 +17,11 @@ from app.eval.test_cases import TEST_CASES
 from app.worker.pipeline import run_full_pipeline
 
 PROMPTS = {
-    "orchestrator": ORCHESTRATOR_SYSTEM,
-    "decomposition": DECOMPOSITION_SYSTEM,
-    "retrieval": RETRIEVAL_SYSTEM,
-    "critique": CRITIQUE_SYSTEM,
-    "synthesis": SYNTHESIS_SYSTEM,
+    "orchestrator": FALLBACK_ORCHESTRATOR_SYSTEM,
+    "decomposition": FALLBACK_DECOMPOSITION_SYSTEM,
+    "retrieval": FALLBACK_RETRIEVAL_SYSTEM,
+    "critique": FALLBACK_CRITIQUE_SYSTEM,
+    "synthesis": FALLBACK_SYNTHESIS_SYSTEM,
 }
 
 

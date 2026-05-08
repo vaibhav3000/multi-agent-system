@@ -3,10 +3,11 @@ import time
 
 from app.core.budget import consume_budget, register_agent_budget
 from app.core.context_schema import AgentID, AgentOutput, SharedContext, SubTask
+from app.core.database import get_active_prompt
 from app.core.llm import call_llm
 from app.core.logger import structured_log
 
-DECOMPOSITION_SYSTEM = """You are a decomposition agent. Break the given query into typed sub-tasks.
+FALLBACK_DECOMPOSITION_SYSTEM = """You are a decomposition agent. Break the given query into typed sub-tasks.
 
 Output a JSON object:
 {
@@ -32,6 +33,7 @@ Rules:
 async def run_decomposition(ctx: SharedContext) -> list[SubTask]:
     start = time.time()
     register_agent_budget(ctx, AgentID.DECOMPOSITION)
+    system_prompt = get_active_prompt(AgentID.DECOMPOSITION.value, FALLBACK_DECOMPOSITION_SYSTEM)
 
     prompt = f"Query to decompose: {ctx.original_query}"
 
@@ -43,7 +45,7 @@ async def run_decomposition(ctx: SharedContext) -> list[SubTask]:
         )
         return []
 
-    response = call_llm(prompt, system=DECOMPOSITION_SYSTEM, max_tokens=1000)
+    response = call_llm(prompt, system=system_prompt, max_tokens=1000)
 
     raw = response.text
     latency = (time.time() - start) * 1000

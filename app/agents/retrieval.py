@@ -3,11 +3,12 @@ import time
 
 from app.core.budget import consume_budget, register_agent_budget
 from app.core.context_schema import AgentID, AgentOutput, SharedContext, ToolCall
+from app.core.database import get_active_prompt
 from app.core.llm import call_llm
 from app.core.logger import structured_log
 from app.tools.web_search import run_web_search
 
-RETRIEVAL_SYSTEM = """You are a retrieval-augmented reasoning agent. You perform multi-hop reasoning.
+FALLBACK_RETRIEVAL_SYSTEM = """You are a retrieval-augmented reasoning agent. You perform multi-hop reasoning.
 
 Rules:
 - You must retrieve at least two separate chunks of information before forming an answer
@@ -30,6 +31,7 @@ Output format:
 async def run_retrieval(ctx: SharedContext) -> dict:
     start = time.time()
     register_agent_budget(ctx, AgentID.RETRIEVAL)
+    system_prompt = get_active_prompt(AgentID.RETRIEVAL.value, FALLBACK_RETRIEVAL_SYSTEM)
 
     subtask_descriptions = [t.description for t in ctx.subtasks if t.status != "complete"]
     query_context = "\n".join(subtask_descriptions) if subtask_descriptions else ctx.original_query
@@ -58,7 +60,7 @@ Chunk 2 findings: {json.dumps(hop2_result)}
 Now produce a JSON answer following the required output format with citations linking claims to chunk_1 or chunk_2.
 """
 
-    response = call_llm(synthesis_prompt, system=RETRIEVAL_SYSTEM, max_tokens=1500)
+    response = call_llm(synthesis_prompt, system=system_prompt, max_tokens=1500)
 
     raw = response.text
     latency = (time.time() - start) * 1000

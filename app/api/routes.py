@@ -12,7 +12,7 @@ from app.agents.meta import handle_rewrite_action
 from app.api.sse import sse_payload
 from app.core.context_manager import save_context
 from app.core.context_schema import SharedContext
-from app.core.database import AsyncSessionLocal, Job, get_latest_eval_summary, get_session, init_db
+from app.core.database import AsyncSessionLocal, Job, get_latest_eval_summary, get_session
 from app.eval.harness import run_eval_suite
 from app.worker.job_processor import process_query
 from app.worker.pipeline import run_full_pipeline
@@ -56,7 +56,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.on_event("startup")
 async def startup() -> None:
-    await init_db()
+    return None
 
 
 @app.post("/query")
