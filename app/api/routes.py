@@ -59,6 +59,11 @@ async def startup() -> None:
     return None
 
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
 @app.post("/query")
 async def query(request: QueryRequest):
     job_id = str(uuid.uuid4())
