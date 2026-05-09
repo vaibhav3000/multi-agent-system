@@ -8,7 +8,7 @@ To run this project locally, you will need Docker and Docker Compose installed.
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/multi-agent-system.git
+   git clone https://github.com/vaibhav3000/multi-agent-system.git
    cd multi-agent-system
    ```
 
