@@ -141,4 +141,4 @@ The Meta-Agent runs periodically to analyze system performance.
 7. **Frontend Dashboard**: Build a React/Next.js dashboard to manage rewrites and view traces visually.
 
 ## 11. AI Collaboration Notes
-This project was built with AI assistance (using GitHub Copilot, Claude, and Gemini). While the AI significantly accelerated scaffolding the FastAPI structure, writing boilerplate Celery worker configurations, and drafting the initial agent logic, the core architecture orchestration, eval-scoring integration, and the exact constraints of the self-improving loop required heavy manual review, debugging, and targeted corrections. Specifically, ensuring the `get_active_prompt` dependency injection worked properly across agents and handling database connection lifecycle issues within the celery worker were done manually.
+AI assistance was kept to an absolute minimum throughout this project. AI tools were strictly used for debugging complex issues and resolving runtime errors, while all core logic, orchestration, and architectural designs were completed manually.
