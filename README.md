@@ -157,4 +157,4 @@ The Meta-Agent runs periodically to analyze system performance.
 7. **Frontend Dashboard**: Build a React/Next.js dashboard to manage rewrites and view traces visually.
 
 ## 11. AI Collaboration Notes
-AI assistance was kept to an absolute minimum throughout this project. AI tools were strictly used for debugging complex issues and resolving runtime errors, while all core logic, orchestration, and architectural designs were completed manually.
+AI assistance was kept to be minimum throughout this project. AI tools were strictly used for debugging complex issues and resolving runtime errors, while all core logic, orchestration, and architectural designs were completed manually.
