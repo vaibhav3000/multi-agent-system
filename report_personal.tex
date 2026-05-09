@@ -1,0 +1,84 @@
+\documentclass[11pt]{article}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{fancyhdr}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[C]{Personal Study Guide: Multi-Agent LLM System}
+\fancyfoot[C]{\thepage}
+
+\title{Personal Study Guide \& Interview Prep}
+\author{Self-Reference Manual}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{How Do I Explain This Project in 60 Seconds?}
+"I built a production-grade multi-agent LLM system designed to tackle complex, multi-step queries that standard conversational AI fails at. Instead of a single monolithic prompt, I implemented a decentralized architecture where seven specialized agents—like Orchestrator, Retrieval, and Critique—collaborate around a central Shared Context. It's technically interesting because I built a strict context budget manager using tiktoken to prevent runaway costs, and a Self-Improving Loop where a Meta-Agent automatically proposes prompt rewrites based on structured evaluation metrics. I primarily used DeepSeek due to its excellent coding and reasoning performance, but it's entirely model-agnostic. The most impressive detail is the human-in-the-loop rewrite approval system, which creates an observable, continuously improving architecture."
+
+\section{How Does the Orchestrator Actually Work?}
+When a query arrives, it is registered in the \texttt{SharedContext} and picked up by the Celery worker. The first function called is \texttt{run\_orchestrator}. The orchestrator sends the current pipeline state (like completed agents and remaining budget) and the query to DeepSeek. It requires a strict JSON response containing \texttt{reasoning}, \texttt{next\_agents}, and \texttt{context\_budget\_allocation}. If the LLM hallucinates malformed JSON or times out, the code explicitly catches the \texttt{JSONDecodeError} and gracefully falls back to a sequential \texttt{["decomposition", "retrieval", "critique", "synthesis"]} pipeline to guarantee execution.
+
+\section{How Does the Budget Manager Work and Why Does It Matter?}
+The budget manager acts like a firewall against infinite loops and massive token bills. I used \texttt{tiktoken} with the \texttt{cl100k\_base} encoding (standard for modern models) to measure string lengths accurately. The \texttt{AGENT\_BUDGETS} dictionary grants the Orchestrator 4000 tokens and Synthesis 6000. When an agent runs, it calls \texttt{consume\_budget}. If it tries to use more tokens than remain, the function logs a \texttt{budget\_violation} to the PostgreSQL \texttt{execution\_logs} table and returns \texttt{False}. The agent detects this and aborts early. This is critical in production because it turns silent, expensive failures into explicit, manageable logs.
+
+\section{How Does Multi-Hop Retrieval Work?}
+Retrieval executes in stages. Hop 1 performs a broad search based on the decomposition tasks. The agent evaluates the returned data to determine what context is still missing. It then crafts a targeted Hop 2 query. The retrieved texts are saved into the context as \texttt{chunk\_1} and \texttt{chunk\_2}. If a tool returns \texttt{TOOL\_TIMEOUT}, the orchestrator allows up to two retries, incrementing the \texttt{retry\_count} inside the \texttt{ToolCall} schema for full auditability.
+
+\section{How Does the Critique Agent Avoid Flagging the Whole Output?}
+I designed the Critique agent to evaluate outputs claim-by-claim. Instead of giving a generic "7/10" to an entire essay, it outputs an array of \texttt{ClaimScore} objects. Each object extracts a specific \texttt{claim\_text}, assigns a \texttt{confidence} float, and sets a boolean \texttt{flagged} field with a \texttt{flag\_reason}. This granular approach allows the Synthesis agent to surgically rewrite only the contradictory parts rather than generating an entirely new draft from scratch.
+
+\section{How Does the Self-Improving Loop Work End to End?}
+Imagine the retrieval agent hallucinates during an adversarial test case. The eval harness runs and scores "Citation Accuracy" terribly (e.g., 0.1). This run is saved. The Meta-Agent wakes up, queries the DB, and spots this failure. It maps the poor citation score to the Retrieval agent, and asks DeepSeek: "Look at this failure. Propose a new system prompt." DeepSeek generates a rewrite, which is saved as \texttt{pending}. I manually hit the \texttt{/rewrites/\{id\}} endpoint to approve it. The system updates the \texttt{AgentPrompt} table. The next time the Retrieval agent runs, \texttt{get\_active\_prompt()} pulls this new prompt dynamically. Finally, the system reruns the test case, logs the new score, and calculates the \texttt{PerformanceDelta}.
+
+\section{What Are the Failure Contracts for Each Tool?}
+\begin{itemize}
+    \item \textbf{web\_search}: \texttt{TOOL\_TIMEOUT}, \texttt{TOOL\_EMPTY}, \texttt{TOOL\_MALFORMED}
+    \item \textbf{code\_executor}: \texttt{TOOL\_TIMEOUT}, \texttt{TOOL\_EMPTY}, \texttt{TOOL\_MALFORMED}, \texttt{TOOL\_ERROR}
+    \item \textbf{data\_lookup}: \texttt{TOOL\_TIMEOUT}, \texttt{TOOL\_EMPTY}, \texttt{TOOL\_SQL\_ERROR}
+\end{itemize}
+
+\section{How Does SSE Streaming Work in This System?}
+Server-Sent Events (SSE) allow the server to push updates to the client over a single HTTP connection. The system emits events like \texttt{agent\_start}, \texttt{tool\_call\_start}, \texttt{context\_budget\_update}, and \texttt{pipeline\_complete} as the Celery pipeline runs. Currently, it emits event-level updates (entire chunks of progress). To achieve true token-level streaming, I would need to pass an async generator through the LLM client call itself, allowing the UI to render text as the LLM thinks.
+
+\section{What Would I Build Next and Why?}
+\begin{enumerate}
+    \item \textbf{Secure Code Sandbox}: Integrating Firecracker microVMs. Python \texttt{eval} is dangerous; a secure sandbox is mandatory for production.
+    \item \textbf{True Token Streaming}: Modifying the SSE pipeline to yield partial tokens. This is crucial for perceived UX latency.
+    \item \textbf{Auth Middleware}: Adding JWT verification. The API is currently open, which is unacceptable for enterprise deployment.
+\end{enumerate}
+
+\section{What Are the Hardest Technical Questions I Might Get Asked?}
+\begin{itemize}
+    \item \textbf{Why SharedContext instead of direct calls?} Direct calls create tight coupling and infinite loops. A SharedContext acts like a Blackboard, making state fully observable and strictly controlling token budgets.
+    \item \textbf{Concurrent requests?} The Celery worker handles concurrency effortlessly, writing states back to a Postgres database mapped by \texttt{job\_id}.
+    \item \textbf{Lossy vs Lossless compression?} The compression agent uses an LLM to summarize older context (lossy) to fit within token limits, rather than arbitrary truncation.
+\end{itemize}
+
+\section{Honest Weaknesses I Should Acknowledge}
+\begin{itemize}
+    \item The Search tool is currently a stub. I should have integrated the Tavily API, but I prioritized architectural completeness.
+    \item The logging is synchronous in Postgres, which could block high-throughput API calls. I should move logs to an asynchronous Kafka queue.
+\end{itemize}
+
+\section{Quick Reference Cheat Sheet}
+\textbf{Agents:} Orchestrator (4k), Decomposition (3k), Retrieval (5k), Critique (4k), Synthesis (6k), Compression (3k), Meta (4k).\\
+\textbf{Endpoints:} \texttt{POST /query}, \texttt{GET /jobs/\{id\}/trace}, \texttt{GET /evals/latest}, \texttt{POST /rewrites/\{id\}}, \texttt{POST /evals/rerun}.\\
+\textbf{Tables:} \texttt{jobs}, \texttt{eval\_runs}, \texttt{prompt\_rewrites}, \texttt{performance\_deltas}, \texttt{agent\_prompts}, \texttt{execution\_logs}.
+
+\end{document}
