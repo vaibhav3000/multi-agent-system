@@ -3,7 +3,7 @@
 ## 1. Overview
 This is a production-grade multi-agent LLM system designed to tackle complex, multi-step user queries by coordinating specialized sub-agents. It breaks down tasks, retrieves necessary context, drafts responses, and critiques its own work before presenting the final answer. The system is designed to be provider-agnostic but primarily uses DeepSeek as the default LLM provider, while also supporting Groq, Gemini, and a Mock provider for testing. The goal is to create a robust, observable, and self-improving cognitive architecture.
 
-*Note: Extensive architectural documentation and interview-prep materials are available as LaTeX PDFs inside the `docs/` folder.*
+*Note: Extensive architectural documentation and interview-prep materials are available as LaTeX PDFs inside the `Assignment report for Interviewer-Reviewer/` folder.*
 
 ## 2. Setup Instructions
 To run this project locally, you will need Docker and Docker Compose installed.
