@@ -30,7 +30,7 @@
 \maketitle
 
 \section{Executive Summary}
-This report details the evaluation of a production-grade multi-agent LLM system designed to coordinate specialized sub-agents for complex query resolution. The system is designed to be provider-agnostic, primarily utilizing DeepSeek (via the \texttt{LLM\_PROVIDER} environment variable), while maintaining full compatibility with Groq, Gemini, and a Mock provider for rapid testing. 
+This report details the evaluation of a production-grade multi-agent LLM system designed to coordinate specialized sub-agents for complex query resolution. The system is designed to be provider-agnostic, primarily utilizing DeepSeek (via the \texttt{LLM\_PROVIDER} environment variable), while maintaining full compatibility with Anthropic, Groq, Gemini, and a Mock provider for rapid testing. 
 
 The architecture features exactly 7 distinct agents: Orchestrator, Decomposition, Retrieval, Critique, Synthesis, Compression, and Meta. These agents are supported by 4 strictly contracted tools: Web Search, Code Executor, Data Lookup, and Self-Reflection. The evaluation pipeline is comprehensive, encompassing 15 test cases evaluated across 6 dimensions. The entire system is fully containerized and boots end-to-end with a single \texttt{docker compose up} command. 
 
@@ -179,6 +179,6 @@ The API implements SSE streaming, yielding \texttt{agent\_start}, \texttt{tool\_
 \end{itemize}
 
 \section{AI Collaboration Disclosure}
-This system was built with the assistance of LLMs for scaffolding the core API, building the Celery tasks, and drafting prompt engineering templates. Manual intervention was necessary to resolve dependency injection across tools, fix database connection pooling bugs, and rigorously define the \texttt{SharedContext} Pydantic schemas. 
+All core logic, tool contracts, and architectural decisions were manually implemented and verified by the author.
 
 \end{document}

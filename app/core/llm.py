@@ -123,6 +123,13 @@ def call_llm(
             max_tokens=max_tokens,
             model=model or os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
         )
+    if provider == "anthropic":
+        return _call_anthropic(
+            user_content,
+            system=system,
+            max_tokens=max_tokens,
+            model=model or os.getenv("ANTHROPIC_MODEL", "claude-3-haiku-20240307"),
+        )
     raise RuntimeError(f"Unsupported LLM_PROVIDER={provider}")
 
 
@@ -180,5 +187,42 @@ def _call_gemini(
         text=text,
         input_tokens=int(usage.get("promptTokenCount") or 0),
         output_tokens=int(usage.get("candidatesTokenCount") or 0),
+    )
+
+
+def _call_anthropic(
+    user_content: str,
+    *,
+    system: str | None,
+    max_tokens: int,
+    model: str,
+) -> LLMResponse:
+    api_key = _require_env("ANTHROPIC_API_KEY")
+    url = "https://api.anthropic.com/v1/messages"
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "temperature": 0.2,
+        "messages": [{"role": "user", "content": user_content}],
+    }
+    if system:
+        payload["system"] = system
+
+    with httpx.Client(timeout=60.0) as client:
+        response = client.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        data = response.json()
+
+    text = data["content"][0]["text"]
+    usage = data.get("usage", {})
+    return LLMResponse(
+        text=text,
+        input_tokens=int(usage.get("input_tokens", 0)),
+        output_tokens=int(usage.get("output_tokens", 0)),
     )
 
