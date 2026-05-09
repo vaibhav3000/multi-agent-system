@@ -14,6 +14,7 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{fancyhdr}
+\usepackage{array}
 
 \pagestyle{fancy}
 \fancyhf{}
@@ -37,7 +38,7 @@ The source code resides at \url{https://github.com/vaibhav3000/multi-agent-syste
 
 \section{Requirements Compliance Matrix}
 
-\begin{longtable}{p{0.35\linewidth} p{0.1\linewidth} p{0.25\linewidth} p{0.2\linewidth}}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.32\linewidth} >{\raggedright\arraybackslash}p{0.08\linewidth} >{\raggedright\arraybackslash}p{0.32\linewidth} >{\raggedright\arraybackslash}p{0.18\linewidth}}
 \toprule
 \textbf{Requirement} & \textbf{Status} & \textbf{Evidence} & \textbf{Notes} \\
 \midrule
@@ -46,32 +47,32 @@ The source code resides at \url{https://github.com/vaibhav3000/multi-agent-syste
 \textbf{Requirement} & \textbf{Status} & \textbf{Evidence} & \textbf{Notes} \\
 \midrule
 \endhead
-Dynamic routing orchestrator with logged justification & Met & \texttt{app/agents/orchestrator.py} (run\_orchestrator) & Logs explicitly to \texttt{ctx.routing\_log} and \texttt{structured\_log}. \\
-Decomposition agent with dependency graph & Met & \texttt{app/agents/decomposition.py} & Subtasks include \texttt{depends\_on} field. \\
-Retrieval agent with multi-hop minimum two chunks & Met & \texttt{app/agents/retrieval.py} & Retrieves \texttt{chunk\_1} and \texttt{chunk\_2}. \\
-Critique agent with claim-level scoring not whole-output scoring & Met & \texttt{app/agents/critique.py} & Uses \texttt{ClaimScore} schema. \\
-Synthesis agent with provenance map and contradiction resolution & Met & \texttt{app/agents/synthesis.py} & Resolves flagged claims directly. \\
-Shared context object with defined schema, agents do not call each other directly & Met & \texttt{app/core/context\_schema.py} & Agents only mutate \texttt{SharedContext}. \\
-Web search tool with failure contract & Met & \texttt{app/tools/web\_search.py} & Defines TOOL\_TIMEOUT, TOOL\_EMPTY, TOOL\_MALFORMED. \\
-Code execution tool with failure contract & Met & \texttt{app/tools/code\_executor.py} & Returns explicit failure codes. \\
-Structured data lookup tool with NL to SQL & Met & \texttt{app/tools/data\_lookup.py} & Parses query to simulated SQL. \\
-Self-reflection tool with failure contract & Met & \texttt{app/tools/self\_reflection.py} & Exposes reflection timeout/malformed. \\
-Tool retry logic up to two retries logged separately & Met & \texttt{app/agents/retrieval.py} & Retry count updated in \texttt{ToolCall}. \\
-Context budget manager with token tracking per agent & Met & \texttt{app/core/budget.py} & Uses \texttt{cl100k\_base} tiktoken encoding. \\
-Budget violation caught and logged not silently truncated & Met & \texttt{app/core/budget.py} (consume\_budget) & Returns \texttt{False} and logs violation. \\
-Compression agent for context overflow & Met & \texttt{app/agents/compression.py} & Summarizes old context when overflowed. \\
-15 eval test cases with correct category breakdown & Met & \texttt{app/eval/test\_cases.py} & 5 Baseline, 5 Ambiguous, 5 Adversarial. \\
-All 6 scoring dimensions with numeric score and justification string & Met & \texttt{app/eval/scoring.py} & Output schema requires float score and string. \\
-Eval runs stored in DB with full reproducibility & Met & \texttt{app/core/database.py} (\texttt{EvalRun}) & Persisted via SQLAlchemy. \\
-Meta-agent proposes prompt rewrites stored as pending & Met & \texttt{app/agents/meta.py} & Populates \texttt{PromptRewrite} table. \\
-Human approval endpoint for rewrites & Met & \texttt{app/api/routes.py} (rewrite\_action) & Exposes \texttt{/rewrites/\{id\}} endpoint. \\
-Rerun on failed cases with performance delta stored & Met & \texttt{app/api/routes.py} (rerun\_evals) & Persists \texttt{PerformanceDelta}. \\
-SSE streaming with agent identity and tool call visibility & Met & \texttt{app/api/routes.py} (query) & Yields SSE payloads. \\
-Structured logging with consistent schema & Met & \texttt{app/core/logger.py} & Outputs to \texttt{ExecutionLog} table. \\
-Full execution trace endpoint by job ID & Met & \texttt{app/api/routes.py} (job\_trace) & Exposes \texttt{/jobs/\{job\_id\}/trace}. \\
-Exactly 5 API endpoints & Met & \texttt{app/api/routes.py} & query, trace, evals/latest, rewrites, evals/rerun (+health). \\
-Error responses with machine-readable code, human message, job ID & Met & \texttt{app/api/routes.py} (error\_payload) & Follows requested error shape. \\
-Docker compose up starts all services with zero manual steps & Met & \texttt{docker-compose.yml} & Boots api, worker, redis, db, logui. \\
+Dynamic routing orchestrator with logged justification & Met & \path{app/agents/orchestrator.py} (run\_orchestrator) & Logs explicitly to \texttt{ctx.routing\_log} and \texttt{structured\_log}. \\
+Decomposition agent with dependency graph & Met & \path{app/agents/decomposition.py} & Subtasks include \texttt{depends\_on} field. \\
+Retrieval agent with multi-hop minimum two chunks & Met & \path{app/agents/retrieval.py} & Retrieves \texttt{chunk\_1} and \texttt{chunk\_2}. \\
+Critique agent with claim-level scoring not whole-output scoring & Met & \path{app/agents/critique.py} & Uses \texttt{ClaimScore} schema. \\
+Synthesis agent with provenance map and contradiction resolution & Met & \path{app/agents/synthesis.py} & Resolves flagged claims directly. \\
+Shared context object with defined schema, agents do not call each other directly & Met & \path{app/core/context_schema.py} & Agents only mutate \texttt{SharedContext}. \\
+Web search tool with failure contract & Met & \path{app/tools/web_search.py} & Defines TOOL\_TIMEOUT, TOOL\_EMPTY, TOOL\_MALFORMED. \\
+Code execution tool with failure contract & Met & \path{app/tools/code_executor.py} & Returns explicit failure codes. \\
+Structured data lookup tool with NL to SQL & Met & \path{app/tools/data_lookup.py} & Parses query to simulated SQL. \\
+Self-reflection tool with failure contract & Met & \path{app/tools/self_reflection.py} & Exposes reflection timeout/malformed. \\
+Tool retry logic up to two retries logged separately & Met & \path{app/agents/retrieval.py} & Retry count updated in \texttt{ToolCall}. \\
+Context budget manager with token tracking per agent & Met & \path{app/core/budget.py} & Uses \texttt{cl100k\_base} tiktoken encoding. \\
+Budget violation caught and logged not silently truncated & Met & \path{app/core/budget.py} (consume\_budget) & Returns \texttt{False} and logs violation. \\
+Compression agent for context overflow & Met & \path{app/agents/compression.py} & Summarizes old context when overflowed. \\
+15 eval test cases with correct category breakdown & Met & \path{app/eval/test_cases.py} & 5 Baseline, 5 Ambiguous, 5 Adversarial. \\
+All 6 scoring dimensions with numeric score and justification string & Met & \path{app/eval/scoring.py} & Output schema requires float score and string. \\
+Eval runs stored in DB with full reproducibility & Met & \path{app/core/database.py} (\texttt{EvalRun}) & Persisted via SQLAlchemy. \\
+Meta-agent proposes prompt rewrites stored as pending & Met & \path{app/agents/meta.py} & Populates \texttt{PromptRewrite} table. \\
+Human approval endpoint for rewrites & Met & \path{app/api/routes.py} (rewrite\_action) & Exposes \texttt{/rewrites/\{id\}} endpoint. \\
+Rerun on failed cases with performance delta stored & Met & \path{app/api/routes.py} (rerun\_evals) & Persists \texttt{PerformanceDelta}. \\
+SSE streaming with agent identity and tool call visibility & Met & \path{app/api/routes.py} (query) & Yields SSE payloads. \\
+Structured logging with consistent schema & Met & \path{app/core/logger.py} & Outputs to \texttt{ExecutionLog} table. \\
+Full execution trace endpoint by job ID & Met & \path{app/api/routes.py} (job\_trace) & Exposes \texttt{/jobs/\{job\_id\}/trace}. \\
+Exactly 5 API endpoints & Met & \path{app/api/routes.py} & query, trace, evals/latest, rewrites, evals/rerun (+health). \\
+Error responses with machine-readable code, human message, job ID & Met & \path{app/api/routes.py} (error\_payload) & Follows requested error shape. \\
+Docker compose up starts all services with zero manual steps & Met & \path{docker-compose.yml} & Boots api, worker, redis, db, logui. \\
 No hardcoded credentials & Met & Entire Codebase & Verified via grep scan. \\
 README with all required sections & Met & \texttt{README.md} & Follows exact requested structure. \\
 Architecture diagram & Met & \texttt{README.md} & ASCII diagram included. \\
