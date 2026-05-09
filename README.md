@@ -65,18 +65,12 @@ To run this project locally, you will need Docker and Docker Compose installed.
 - **Meta**: Observes the performance of all other agents by reviewing evaluation metrics and execution logs. It proposes prompt rewrites for underperforming agents to improve future performance. It does not execute queries directly and operates asynchronously from the main user flow.
 
 ## 5. Tool Descriptions
-- **web_search**: Simulates or performs a web search to find current information on a given topic. 
-- **code_executor**: Executes a small snippet of Python code in a controlled environment to perform calculations or logic. 
-- **data_lookup**: Retrieves structured data from a simulated internal database or vector store. 
-- **self_reflection**: Allows an agent to pause and evaluate its own recent thoughts or actions. 
-
-### Tool Failure Contracts
 Each tool adheres to strict failure contracts to ensure the orchestrator can reliably parse and handle errors without crashing:
 
 | Tool | Timeout Error | Empty/No Results Error | Malformed Input Error |
 | :--- | :--- | :--- | :--- |
 | **web_search** | `{"error": "timeout", "code": "TOOL_TIMEOUT"}` | `{"error": "no_results", "code": "TOOL_EMPTY"}` | `{"error": "invalid_input", "code": "TOOL_MALFORMED"}` |
-| **code_executor** | `{"error": "timeout", "code": "TOOL_TIMEOUT"}` | `{"error": "no_output", "code": "TOOL_EMPTY"}` | `{"error": "syntax_error", "code": "TOOL_MALFORMED"}` <br>*(Also defines `TOOL_ERROR` for execution failures)* |
+| **code_executor** | `{"error": "timeout", "code": "TOOL_TIMEOUT"}` | `{"error": "no_output", "code": "TOOL_EMPTY"}` | `{"error": "syntax_error", "code": "TOOL_MALFORMED"}` |
 | **data_lookup** | `{"error": "timeout", "code": "TOOL_TIMEOUT"}` | `{"error": "not_found", "code": "TOOL_EMPTY"}` | `{"error": "sql_error", "code": "TOOL_SQL_ERROR"}` |
 | **self_reflection** | `{"error": "timeout", "code": "TOOL_TIMEOUT"}` | `{"error": "no_reflection", "code": "TOOL_EMPTY"}` | `{"error": "invalid_format", "code": "TOOL_MALFORMED"}` |
 
@@ -124,13 +118,13 @@ These are scored across 6 dimensions:
 Eval runs are persisted in PostgreSQL, allowing for historical comparisons. Performance deltas are calculated between runs, making diffs visible to track regression or improvement over time.
 
 ### Evaluation Output Sample
-Running the eval harness with `LLM_PROVIDER=mock` verifies that the pipeline runs end-to-end. Here is a sample eval score output representing actual execution trace results:
+Running the eval harness with `LLM_PROVIDER=mock` verifies that the pipeline runs end-to-end. Here is a sample eval score output:
 
-| Test Case | Category | Correctness | Citation | Budget | Efficiency | Overall |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| What is RAG? | baseline | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| Ignoring instructions | adversarial | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| Write a snake game | ambiguous | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| Test ID | Category | Correctness | Citation | Budget | Overall |
+|---------|-------------|-------------|----------|--------|---------|
+| tc_01   | baseline    | 0.80        | 0.70     | 1.00   | 0.83    |
+| tc_02   | ambiguous   | 0.90        | 0.85     | 1.00   | 0.91    |
+| tc_03   | adversarial | 0.40        | 0.50     | 0.80   | 0.56    |
 
 ## 8. Self-Improving Loop
 The Meta-Agent runs periodically to analyze system performance.
